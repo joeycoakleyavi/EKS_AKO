@@ -1,0 +1,435 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: A CloudFormation template which deploys an EKS cluster, bastion host, and AKO.
+
+Metadata: 
+  AWS::CloudFormation::Interface: 
+    ParameterGroups: 
+      - 
+        Label: 
+          default: "EKS Configuration"
+        Parameters: 
+          - pKeyName
+          - pVPCId
+          - pAllowedSSHCidr
+          - pAddressSpace
+          - pBastionAMI
+      - 
+        Label: 
+          default: "AKO Configuration"
+        Parameters: 
+          - pAviControllerIP
+          - pAviControllerUsername
+          - pAviControllerPassword
+          - pAviControllerVersion
+          - pAviAWSCloudName
+          - pVipSubnetId
+          - pVipNetworkId
+          - pVipNetworkMaskLength
+
+Parameters: 
+  pBastionAMI:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+  
+  pKeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+
+  pVPCId:
+    Type: AWS::EC2::VPC::Id
+
+  pAddressSpace:
+    Type: String
+    Description: Provide at least a /24 that is unused within the VPC.
+
+  pAllowedSSHCidr:
+    Type: String
+    Description: Enter the CIDR that is allowed SSH access to the bastion host.
+
+  pAviControllerIP:
+    Type: String
+    Description: Enter the private Ip address of the Avi Controller
+
+  pAviControllerUsername:
+    Type: String
+    Description: Enter the Avi Controller Username
+
+  pAviControllerPassword:
+    Type: String
+    Description: Avi Controller Password
+    NoEcho: True
+  
+  pAviControllerVersion:
+    Type: String
+    Description: Major & minor version of the Avi controller. ie 20.1.3
+
+  pAviAWSCloudName:
+    Type: String
+    Description: Name of the AWS cloud defined in the Avi Controller
+
+  pVipSubnetId:
+    Description: Select the subnet in which VIPs are deployed into
+    Type: AWS::EC2::Subnet::Id
+
+  pVipNetworkId:
+    Type: String
+    Description: Enter the Network Id of VIP network. e.g. 10.20.0.0
+
+  pVipNetworkMaskLength:
+    Type: Number
+    Description: Enter the mask length of the Vip Network. e.g. 24
+    Default: 24
+
+    
+
+#Mappings: 
+
+#Conditions: 
+
+Resources: 
+  rPublicRT:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref pVPCId
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PublicRouteTable
+
+  rPrivateRT:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref pVPCId
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PrivateRouteTable
+
+  rInternetRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref rPublicRT
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !GetAtt rIGWLookup.IGW-Id
+
+  rPrivateRouteToNATGW:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref rPrivateRT
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref rNATGateway
+
+  rPublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: True
+      AvailabilityZone: !Select
+        - 0
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      VpcId: !Ref pVPCId
+      CidrBlock: !Select [0, !Cidr [!Ref pAddressSpace, 4, 5]]
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PublicSubnet
+
+  rPrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 0
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      VpcId: !Ref pVPCId
+      CidrBlock: !Select [1, !Cidr [!Ref pAddressSpace, 4, 5]]
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PrivateSubnet1
+
+  rPrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 1
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      VpcId: !Ref pVPCId
+      CidrBlock: !Select [2, !Cidr [!Ref pAddressSpace, 4, 5]]
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PrivateSubnet2
+
+  PublicSubnetRouteAssocation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref rPublicSubnet
+      RouteTableId: !Ref rPublicRT
+
+  PrivateSubnet1RouteAssocation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref rPrivateSubnet1
+      RouteTableId: !Ref rPrivateRT
+
+  PrivateSubnet2RouteAssocation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref rPrivateSubnet2
+      RouteTableId: !Ref rPrivateRT
+
+  rNATGatewayEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  rNATGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt rNATGatewayEIP.AllocationId
+      SubnetId: !Ref rPublicSubnet
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-NAT Gateway
+
+  rEKSClusterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - eks.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+
+  rEKSWorkerNodeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Sub "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+        - !Sub "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+        - !Sub "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+      Path: /
+
+  rEKSClusterSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${AWS::StackName}-EKSClusterSG
+      GroupDescription: Security Group for EKS Cluster Nodes
+      VpcId: !Ref pVPCId
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 443
+          ToPort: 443
+          IpProtocol: tcp
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: "-1"
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-EKSClusterSecurityGroup
+
+  rEKSWorkerNodeSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: EKSWorkerNodeSG
+      GroupDescription: Security Group for EKS Worker Nodes
+      VpcId: !Ref pVPCId
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: "-1"
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: "-1"
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-EKSWorkerNodeSecurityGroup
+
+  rBastionHostSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: BastionSG
+      GroupDescription: Restricts which hosts can SSH into the bastion host.
+      VpcId: !Ref pVPCId
+      SecurityGroupIngress:
+        - CidrIp: !Ref pAllowedSSHCidr
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: "-1"
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-BastionHostSecurityGroup
+
+  rEKSCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      KubernetesNetworkConfig:
+        ServiceIpv4Cidr: 192.168.100.0/24
+      Name: !Sub ${AWS::StackName}-EKSCluster
+      ResourcesVpcConfig:
+        SecurityGroupIds:
+          - !GetAtt rEKSClusterSecurityGroup.GroupId
+        SubnetIds: 
+          - !Ref rPrivateSubnet1
+          - !Ref rPrivateSubnet2
+      RoleArn: !GetAtt rEKSClusterRole.Arn
+
+  rEKSNodeGroup:
+    Type: AWS::EKS::Nodegroup
+    Properties:
+      AmiType: AL2_x86_64
+      ClusterName: !Ref rEKSCluster
+      NodeRole: !GetAtt rEKSWorkerNodeRole.Arn
+      Subnets:
+        - !Ref rPrivateSubnet1
+        - !Ref rPrivateSubnet2
+
+  rBastionHostRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub eks-demo-${AWS::StackName}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Path: /
+      Policies:
+        - PolicyName: EKSManagement
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: eks:*
+                Resource:
+                  - !Sub arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/*
+                  - !Sub arn:aws:eks:${AWS::Region}:${AWS::AccountId}:nodegroup/*
+
+  rBastionHostInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      InstanceProfileName: !Sub eks-demo-${AWS::StackName}
+      Roles:
+        - !Ref rBastionHostRole
+
+  rBastionHost:
+    DependsOn: rEKSNodeGroup
+    Type: AWS::EC2::Instance
+    Properties:
+      KeyName: !Ref pKeyName
+      ImageId: !Ref pBastionAMI
+      InstanceType: t2.micro
+      SubnetId: !Ref rPublicSubnet
+      IamInstanceProfile: !Ref rBastionHostInstanceProfile
+      Monitoring: false
+      SecurityGroupIds:
+        - !GetAtt rBastionHostSecurityGroup.GroupId
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -ex
+          yum update -y
+          curl -o /usr/local/bin/kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.18.9/2020-11-02/bin/linux/amd64/kubectl
+          chmod +x /usr/local/bin/kubectl
+          curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+          chmod +x get_helm.sh
+          ./get_helm.sh
+          echo "aws eks --region ${AWS::Region} update-kubeconfig --name ${rEKSCluster} --role arn:aws:iam::747965802047:role/cfn_deploy" >> ~/init.sh
+          echo "kubectl create ns avi-system" >> ~/init.sh
+          echo "helm repo add ako https://avinetworks.github.io/avi-helm-charts/charts/stable/ako" >> ~/init.sh
+          echo "wget https://raw.githubusercontent.com/avinetworks/avi-helm-charts/master/charts/stable/ako/values.yaml" >> ~/init.sh
+          echo "helm install  ako/ako  --generate-name --version 1.3.1 -f values.yaml --set ControllerSettings.controllerHost=${pAviControllerIP} \
+          --set ControllerSettings.cloudName=${pAviAWSCloudName} \
+          --set ControllerSettings.controllerversion=${pAviControllerVersion} \
+          --set avicredentials.username=${pAviControllerUsername} \
+          --set avicredentials.password=${pAviControllerPassword} \
+          --set NetworkSettings.subnetIP=${pVipNetworkId} \
+          --set NetworkSettings.subnetPrefix=${pVipNetworkMaskLength} \
+          --set NetworkSettings.networkName=${pVipSubnetId} \
+          --namespace=avi-system" >> ~/init.sh
+          chmod +x ~/init.sh
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-BastionHost
+
+  rIGWLookupLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Path: /
+      Policies:
+        - PolicyName: UpdateRouteLambdaExecutionRole
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ec2:Describe*
+                Resource: "*"
+              - Effect: Allow
+                Action: ec2:Get*
+                Resource: "*"
+
+  rIGWLookupLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Looks up IGW by VPC
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt rIGWLookupLambdaExecutionRole.Arn
+      Runtime: python3.8
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import cfnresponse
+
+          def lambda_handler(event, context):
+              print("Event Received")
+              print(event)
+              ec2 = boto3.resource('ec2', region_name=event['ResourceProperties']['Region'])
+              responseData = {}
+              try:
+                  if event["RequestType"] == 'Delete':
+                      print("CloudFormation Delete Event!")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
+                      return
+                  vpc = ec2.Vpc(event['ResourceProperties']['VPC'])
+                  igw = vpc.internet_gateways.all()
+                  if igw:
+                      for i in igw:
+                          #There should only be a single IGW associated to a VPC at any given time.
+                          responseData['IGW-Id'] = i.id
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
+              except:
+                  print("Signaling Failure to CloudFormation")
+                  cfnresponse.send(event, context, cfnresponse.FAILED, responseData)
+
+
+  rIGWLookup:
+    Type: Custom::IGWLookup
+    Properties:
+      ServiceToken: !GetAtt rIGWLookupLambda.Arn
+      Region: !Ref "AWS::Region"
+      VPC: !Ref pVPCId
+#Outputs:
