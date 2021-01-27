@@ -238,7 +238,7 @@ Resources:
   rEKSWorkerNodeSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: EKSWorkerNodeSG
+      GroupName: !Sub EKSWorkerNodeSG-${AWS::StackName}
       GroupDescription: Security Group for EKS Worker Nodes
       VpcId: !Ref pVPCId
       SecurityGroupIngress:
@@ -254,7 +254,7 @@ Resources:
   rBastionHostSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: BastionSG
+      GroupName: !Sub BastionSG-${AWS::StackName}
       GroupDescription: Restricts which hosts can SSH into the bastion host.
       VpcId: !Ref pVPCId
       SecurityGroupIngress:
