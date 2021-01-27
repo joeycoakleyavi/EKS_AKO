@@ -425,11 +425,14 @@ Resources:
                   print("Signaling Failure to CloudFormation")
                   cfnresponse.send(event, context, cfnresponse.FAILED, responseData)
 
-
   rIGWLookup:
     Type: Custom::IGWLookup
     Properties:
       ServiceToken: !GetAtt rIGWLookupLambda.Arn
       Region: !Ref "AWS::Region"
       VPC: !Ref pVPCId
-#Outputs:
+
+Outputs:
+  BastionPublicIP:
+    Description: Bastion host IP for SSH Access
+    Value: !GetAtt rBastionHost.PublicIp
