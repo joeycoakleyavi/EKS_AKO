@@ -293,12 +293,24 @@ Resources:
           - !Ref rPrivateSubnet2
       RoleArn: !GetAtt rEKSClusterRole.Arn
 
+  rEKSNodeGroupLT:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub ${AWS::StackName}-EKSNodeGroupLT
+      LaunchTemplateData:
+        SecurityGroupIds:
+          - !GetAtt rEKSWorkerNodeSecurityGroup.GroupId
+        InstanceType: t3.medium
+
   rEKSNodeGroup:
     Type: AWS::EKS::Nodegroup
     Properties:
       AmiType: AL2_x86_64
       ClusterName: !Ref rEKSCluster
       NodeRole: !GetAtt rEKSWorkerNodeRole.Arn
+      LaunchTemplate:
+        Id: !Ref rEKSNodeGroupLT
+        Version: $Latest
       Subnets:
         - !Ref rPrivateSubnet1
         - !Ref rPrivateSubnet2
@@ -364,11 +376,13 @@ Resources:
           echo "helm install  ako/ako  --generate-name --version 1.3.1 -f values.yaml --set ControllerSettings.controllerHost=${pAviControllerIP} \
           --set ControllerSettings.cloudName=${pAviAWSCloudName} \
           --set ControllerSettings.controllerversion=${pAviControllerVersion} \
+          --set L7Settings.serviceType: NodePort \
           --set avicredentials.username=${pAviControllerUsername} \
           --set avicredentials.password=${pAviControllerPassword} \
           --set NetworkSettings.subnetIP=${pVipNetworkId} \
           --set NetworkSettings.subnetPrefix=${pVipNetworkMaskLength} \
           --set NetworkSettings.networkName=${pVipSubnetId} \
+          --set AKOSettings.clusterName=${rEKSCluster}
           --namespace=avi-system" >> ~/init.sh
           chmod +x ~/init.sh
       Tags:
