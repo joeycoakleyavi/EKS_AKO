@@ -382,7 +382,7 @@ Resources:
           --set NetworkSettings.subnetIP=${pVipNetworkId} \
           --set NetworkSettings.subnetPrefix=${pVipNetworkMaskLength} \
           --set NetworkSettings.networkName=${pVipSubnetId} \
-          --set AKOSettings.clusterName=${rEKSCluster}
+          --set AKOSettings.clusterName=${rEKSCluster} \
           --namespace=avi-system" >> ~/init.sh
           chmod +x ~/init.sh
       Tags:
