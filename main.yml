@@ -376,7 +376,7 @@ Resources:
           echo "helm install  ako/ako  --generate-name --version 1.3.1 -f values.yaml --set ControllerSettings.controllerHost=${pAviControllerIP} \
           --set ControllerSettings.cloudName=${pAviAWSCloudName} \
           --set ControllerSettings.controllerversion=${pAviControllerVersion} \
-          --set L7Settings.serviceType: NodePort \
+          --set L7Settings.serviceType=NodePort \
           --set avicredentials.username=${pAviControllerUsername} \
           --set avicredentials.password=${pAviControllerPassword} \
           --set NetworkSettings.subnetIP=${pVipNetworkId} \
