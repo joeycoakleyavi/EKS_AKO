@@ -4,6 +4,7 @@ This CloudFormation template will deploy an EKS cluster on AWS along with a bast
 ## Assumptions
  - You already have an Avi Controller deployed in the target VPC. Avi Controller parameters are required to build out initialization parameters.
  - The VPC that this template is deployed into has internet access. EKS nodes require connectivity to pull down appropriate container images, and access to the bastion host is via the internet over SSH.
+ - To demo the Hackazon URL, you must configure a DNS listener on the Avi Controller and delegate the example.local domain. The virtual service of the DNS listener is required as input to the CloudFormation template.
 
 ## Caveats
  - When deploying this template, you must delegate the CloudFormation deployment to the "cfn_deploy" role. This is required because when an EKS cluster is created, the creator principle is who is granted administrative access. This workaround was put in place to facilitate testing to folks that may be unfamiliar with AWS and allows a deployment without needing to configure the aws cli.
@@ -39,5 +40,24 @@ Once the CloudFormation Deployment is complete, the final step is to run the ini
     ![Outputs](/images/outputs.png)
 2. Switch to the root user. 
    `sudo su -`
-3. Run the init.sh script `./init.sh`
+3. Run the init.sh script `./init.sh`. This script will complete the configuration of AKO.
     ![Init](/images/init_script.png)
+
+4. Now that AKO is built, deploy the example application. `kubectl apply -f hacknp.yaml`. The values of this application are currently hard coded to use https://hackazon.example.local. 
+    ![Deploy App](/images/deploy_app.png)
+
+## Demo
+*Assignment of an Elastic IP (Public IP) for virtual services created by AKO is currently not supported. A Windows demo host is provisioned so that you can access the URL internally via the demo networks.*
+
+1. RDP into the demo host. The public IP of the demo host can be found in the outputs section of the Cloudformation deployment. Credentials are avidemo // Avi123#@!
+2. Disable Internet Explorer: Enhanced Security Configuration (ESC). This is only required the first time you launch the demo.
+  - Click Start, then select Server Manager
+    ![Server Manager](/images/server_manager.png)
+  - Click Local Server on the lefthand side of Server Manager
+    ![Local Server](/images/local_server.png)
+  - Click the hyperlinked button to the right of IE ESC.
+    ![ESC](/images/esc.png)
+  - Disable for Administrators and Users.
+  - Restart Internet Explorer if it is currently open.
+3. Open Internet Explorer and navigate to https://hackazon.example.local
+    ![Hackzaon](/images/hackazon.png)
