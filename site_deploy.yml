@@ -1,0 +1,14 @@
+---
+- hosts: localhost
+  connection: local
+  roles:
+    - role: avinetworks.avisdk
+  tasks:
+    - name: Pull in Site Variables
+      include_vars: site_vars.yml
+
+    - name: Setup Avi Site
+      import_role:
+        name: avinetworks.aviconfig
+      vars:
+        avi_config_file: site_config.yml

@@ -13,37 +13,85 @@ Metadata:
           - pAllowedSSHCidr
           - pAddressSpace
           - pBastionAMI
-          - pDemoHostAMI
-      - 
-        Label: 
-          default: "AKO Configuration"
-        Parameters: 
-          - pAviControllerIP
-          - pAviControllerUsername
+      -
+        Label:
+          default: Avi Controller Configuration
+        Parameters:
+          - pAviVantageVersion
+          - pInstanceType
           - pAviControllerPassword
-          - pAviControllerVersion
-          - pAviAWSCloudName
-          - pVipSubnetId
-          - pVipNetworkId
-          - pVipNetworkMaskLength
-          - pAviDnsVip
+          - pCreateVMImportExport
+      # - 
+      #   Label: 
+      #     default: "AKO Configuration"
+      #   Parameters: 
+      #     - pAviControllerIP
+      #     - pAviControllerUsername
+      #     - pAviControllerPassword
+      #     - pAviControllerVersion
+      #     - pAviAWSCloudName
+      #     - pVipSubnetId
+      #     - pVipNetworkId
+      #     - pVipNetworkMaskLength
 
 Parameters: 
   pBastionAMI:
     Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
     Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
     Description: You may leave the default value to use the latest Amazon Linux ami.
-
-  pDemoHostAMI:
-    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
-    Default: '/aws/service/ami-windows-latest/Windows_Server-2016-English-Full-Base'
-    Description: You may leave the default value to use the latest Windows AMI.
   
   pKeyName:
     Type: AWS::EC2::KeyPair::KeyName
 
   pVPCId:
     Type: AWS::EC2::VPC::Id
+
+  pInstanceType:
+    Description: Avi Controller instance type
+    Type: String
+    Default: m5.2xlarge
+    AllowedValues:
+      - m5.4xlarge
+      - m5.2xlarge
+      - m4.xlarge
+      - m4.2xlarge
+      - m4.4xlarge
+      - m4.10xlarge
+      - m3.xlarge
+      - m3.2xlarge
+      - c4.large
+      - c4.xlarge
+      - c4.2xlarge
+      - c4.4xlarge
+      - c4.8xlarge
+    ConstraintDescription: must be a valid EC2 instance type.
+
+  pAviVantageVersion:
+    Description: Provide the Version of Avi you would like to install
+    Type: String
+    AllowedValues:
+      - Latest 21.x
+      - Latest 20.x
+      - Latest 18.x
+      - 21.1.1
+      - 21.1.2
+      - 20.1.1
+      - 20.1.2
+      - 20.1.3
+      - 20.1.4
+      - 20.1.5
+      - 20.1.6
+      - 20.1.7
+      - 18.2.13
+    ConstraintDescription: Must be a valid Avi Vantage version
+
+  pCreateVMImportExport:
+    Description: Should this template create the VMImport Role? Select True if this is the first Avi AWS deployment.
+    Type: String
+    Default: "False"
+    AllowedValues:
+      - "True"
+      - "False"
 
   pAddressSpace:
     Type: String
@@ -57,55 +105,18 @@ Parameters:
     AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|1[0-9]|2[0-9]|3[0-2]))$
     ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/0-32.
 
-  pAviControllerIP:
-    Type: String
-    Description: Enter the private Ip address of the Avi Controller
-    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$
-    ConstraintDescription: Controller IP must be in IP Address form. e.g. 192.168.1.1
-
-  pAviControllerUsername:
-    Type: String
-    Description: Enter the Avi Controller Username
-
   pAviControllerPassword:
     Type: String
     Description: Avi Controller Password
     NoEcho: True
   
-  pAviControllerVersion:
-    Type: String
-    Description: Major & minor version of the Avi controller. e.g. 20.1.3
-
-  pAviAWSCloudName:
-    Type: String
-    Description: Name of the AWS cloud defined in the Avi Controller
-
-  pVipSubnetId:
-    Description: Select the subnet in which VIPs are deployed into
-    Type: AWS::EC2::Subnet::Id
-
-  pVipNetworkId:
-    Type: String
-    Description: Enter the Network Id of VIP network. e.g. 10.20.0.0
-    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$
-    ConstraintDescription: Network ID for this parameter is in non-CIDR format. e.g. 10.20.0.0
-
-  pVipNetworkMaskLength:
-    Type: Number
-    Description: Enter the mask length of the Vip Network. e.g. 24
-    Default: 24
-    MinValue: 16
-    MaxValue: 28
-
-  pAviDnsVip:
-    Type: String
-    Description: Enter the IP address of the DNS VIP
-    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$
-    ConstraintDescription: DNS Vip must be in IP Address form. e.g. 192.168.1.1
 
 #Mappings: 
 
-#Conditions: 
+Conditions:
+  CreateVMImportRole: !Equals
+    - !Ref pCreateVMImportExport
+    - "True"
 
 Resources: 
   rPublicRT:
@@ -234,9 +245,9 @@ Resources:
             Action:
               - "sts:AssumeRole"
       ManagedPolicyArns:
-        - !Sub "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-        - !Sub "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-        - !Sub "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+        - "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+        - "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+        - "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
       Path: /
 
   rEKSClusterSecurityGroup:
@@ -372,7 +383,7 @@ Resources:
         - !Ref rBastionHostRole
 
   rBastionHost:
-    DependsOn: rEKSNodeGroup
+    DependsOn: rEKSCluster
     Type: AWS::EC2::Instance
     Properties:
       KeyName: !Ref pKeyName
@@ -387,29 +398,33 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash -ex
           yum update -y
-          curl -o /usr/local/bin/kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.18.9/2020-11-02/bin/linux/amd64/kubectl
-          chmod +x /usr/local/bin/kubectl
-          curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
-          chmod +x get_helm.sh
-          ./get_helm.sh
-          aws s3 cp s3://eks-ako-demo/hacknp.yaml ~/
-          echo "aws eks --region ${AWS::Region} update-kubeconfig --name ${rEKSCluster} --role arn:aws:iam::747965802047:role/cfn_deploy" >> ~/init.sh
-          echo "kubectl create ns avi-system" >> ~/init.sh
-          echo "helm repo add ako https://avinetworks.github.io/avi-helm-charts/charts/stable/ako" >> ~/init.sh
-          echo "wget https://raw.githubusercontent.com/avinetworks/avi-helm-charts/master/charts/stable/ako/values.yaml" >> ~/init.sh
-          echo "helm install  ako/ako  --generate-name --version 1.3.1 -f values.yaml \
-          --set ControllerSettings.controllerHost=${pAviControllerIP} \
-          --set ControllerSettings.cloudName=${pAviAWSCloudName} \
-          --set ControllerSettings.controllerversion=${pAviControllerVersion} \
-          --set L7Settings.serviceType=NodePort \
-          --set avicredentials.username=${pAviControllerUsername} \
-          --set avicredentials.password=${pAviControllerPassword} \
-          --set NetworkSettings.subnetIP=${pVipNetworkId} \
-          --set NetworkSettings.subnetPrefix=${pVipNetworkMaskLength} \
-          --set NetworkSettings.networkName=${pVipSubnetId} \
-          --set AKOSettings.clusterName=${rEKSCluster} \
-          --namespace=avi-system" >> ~/init.sh
-          chmod +x ~/init.sh
+          useradd aviadmin
+          echo aviadmin:${pAviControllerPassword} | chpasswd
+          usermod -aG sudo aviadmin
+          sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          systemctl restart sshd
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod 777 kubectl
+          mv kubectl /usr/bin/
+          aws eks update-kubeconfig --name ${rEKSCluster} --region ${AWS::Region} --role arn:aws:iam::747965802047:role/cfn_deploy
+          mkdir /home/aviadmin/.kube/
+          cp ~/.kube/config /home/aviadmin/.kube/config
+          chown aviadmin:aviadmin -R /home/aviadmin/.kube
+          yum install -y python3 git-core
+          pip3 install ansible
+
+          echo aws_region: ${AWS::Region} >> site_vars.yml
+          echo vpc_id: ${pVPCId} >> site_vars.yml
+          echo private_subnet_1_uuid: ${rPrivateSubnet1} >> site_vars.yml
+          echo private_subnet_1_name: ${AWS::StackName}-PrivateSubnet1 >> site_vars.yml
+          echo private_subnet_1_az: ${rPrivateSubnet1.AvailabilityZone} >> site_vars.yml
+          echo private_subnet_1_uuid: ${rPrivateSubnet2} >> site_vars.yml
+          echo private_subnet_1_name: ${AWS::StackName}-PrivateSubnet2 >> site_vars.yml
+          echo private_subnet_1_az: ${rPrivateSubnet2.AvailabilityZone} >> site_vars.yml
+          echo avi_role_config_log_mode: false >> site_vars.yml
+
+          echo 
+
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-BastionHost
@@ -481,50 +496,695 @@ Resources:
       Region: !Ref "AWS::Region"
       VPC: !Ref pVPCId
 
-  rDemoHostSG:
-    Type: AWS::EC2::SecurityGroup
+  LambdaExecutionPolicyAmiLookup:
+    Type: AWS::IAM::ManagedPolicy
     Properties:
-      GroupName: !Sub ${AWS::StackName}-DemoHostSG
-      GroupDescription: !Sub ${AWS::StackName}-DemoHostSG
+      Path: "/"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: ec2
+            Effect: Allow
+            Action: [
+              'ec2:DescribeImages',
+              'ec2:RunInstances'
+            ]
+            Resource: '*'
+          - Sid: log
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+
+  LambdaExecutionRoleAmiLookup:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      ManagedPolicyArns: [
+        !Ref LambdaExecutionPolicyAmiLookup
+      ]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+      Path: /
+
+  LambdaAMILookup:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: AMI Lookup Lambda Function
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRoleAmiLookup.Arn
+      Runtime: python3.6
+      Timeout: 5
+      Code:
+        ZipFile: |
+          #!/usr/bin/python
+          import boto3
+          import botocore.exceptions
+          import re
+          import cfnresponse
+
+          ec2 = boto3.client('ec2')
+
+          class AmiNotFound(Exception):
+              pass
+          class OptInRequired(Exception):
+              pass
+
+          def get_avi_version(ami):
+              '''
+              Pulls Avi Version out of an AMI Description
+              '''
+              regex = re.compile('\d+\.\d+\.\d+', re.IGNORECASE)
+              m = regex.search(ami['Description'])
+              return m.group() if m else None
+
+          def get_latest_ami_by_major_version(major_version, image_list):
+              '''
+              Get the latest version of a major release. I.E. if 20.x is specified and 20.1.1 - 20.1.6
+              are available, choose 20.1.6
+
+              Acceptable values as of 12/2021: Latest 18.x, Latest 20.x, Latest 21.x
+              '''
+
+              major_version_num = major_version.split(' ')[1].split('.')[0]
+              result = { 'Ami': '', 'Version': ''}
+
+              for image in image_list:
+                  version = get_avi_version(image)
+                  if version and version.startswith(major_version_num):
+                      if not result['Ami']:
+                          result['Ami'] = image['ImageId']
+                          result['Version'] = version
+                      elif version > result['Version']:
+                          result['Ami'] = image['ImageId']
+                          result['Version'] = version
+                      else:
+                          pass
+
+              if not result['Ami']:
+                  raise AmiNotFound("No AMI could be found with the specified parameters")
+
+              return result
+
+          def get_ami_by_version_number(version_number, image_list):
+              result = { 'Ami': '', 'Version': '' }
+              for image in image_list:
+                  version = get_avi_version(image)
+                  if version and version_number in version:
+                      result['Ami'] = image['ImageId']
+                      result['Version'] = version_number
+                      return result
+              raise AmiNotFound("No AMI could be found with the specified parameters")
+
+          def test_ami_permissions(ami, event, context):
+              try:
+                  response = ec2.run_instances(
+                      ImageId=ami,
+                      InstanceType='m5.2xlarge',
+                      DryRun=True,
+                      MaxCount=1,
+                      MinCount=1
+                  )
+              except botocore.exceptions.ClientError as e:
+                  if e.response['Error'].get('Code') == 'DryRunOperation':
+                      pass
+                  elif e.response['Error'].get('Code') == 'OptInRequired':
+                      cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': 'Product is not subscribed to in the AWS Marketplace.'})
+                  else:
+                      cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': 'Unknown exception when testing AMI permissions'})
+
+          response = ec2.describe_images(
+              Filters=[
+                  {
+                      "Name": "product-code",
+                      "Values": [
+                          "a9e7i60gidrc5x9nd7z3qyjj5"
+                      ]
+                  },
+                  {
+                      "Name": "state",
+                      "Values": [
+                          "available"
+                          ]
+                  }
+              ]
+          )
+          images = response['Images']
+
+          def lambda_handler(event, context):
+              requested_image_version = event['ResourceProperties']['VersionRequested']
+              responseData = {}
+
+              try:
+                  if event['RequestType'] == 'Delete':
+                      print('Delete Event Requested')
+                      return(cfnresponse.send(event, context, cfnresponse.SUCCESS, {}))
+
+                  if "Latest" in requested_image_version:
+                      responseData = get_latest_ami_by_major_version(requested_image_version, images)
+                  else:
+                      responseData = get_ami_by_version_number(requested_image_version, images)
+                  
+              except Exception:
+                  responseData = {}
+                  responseData['Error'] = 'Execution error when performing AMI lookup. Please check logs'
+                  response = cfnresponse.send(event, context, cfnresponse.FAILED, responseData)
+                            
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
+
+  AMIInfo:
+    Type: Custom::AMIInfo
+    Properties:
+      ServiceToken: !GetAtt LambdaAMILookup.Arn
+      VersionRequested: !Ref pAviVantageVersion
+
+  AviControllerLT:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub AviControllerLT-${AWS::StackName}
+      LaunchTemplateData: 
+        IamInstanceProfile: 
+          Arn: !GetAtt AviControllerInstanceProfile.Arn
+        ImageId: !GetAtt AMIInfo.Ami
+        InstanceType: !Ref pInstanceType
+
+        UserData:
+          'Fn::Base64':
+            'Fn::Sub': |
+                {
+                "SystemConfiguration":[
+                  {
+                    "url":"/api/systemconfiguration",
+                    "uuid":"default",
+                    "email_configuration":{
+                      "from_email":"admin@avicontroller.net",
+                      "mail_server_port":25,
+                      "smtp_type":"SMTP_NONE",
+                      "mail_server_name":"localhost"
+                    },
+                    "global_tenant_config":{
+                      "se_in_provider_context":true,
+                      "tenant_access_to_provider_se":true,
+                      "tenant_vrf":false
+                    },
+                    "dns_configuration":{
+                      "search_domain":"",
+                      "server_list":[
+                        {
+                          "type":"V4",
+                          "addr":"8.8.8.8"
+                        }
+                      ]
+                    },
+                    "tech_support_uploader_configuration":{
+                      "auto_upload":false
+                    },
+                    "docker_mode":false,
+                    "welcome_workflow_complete": true, 
+                    "portal_configuration":{
+                      "redirect_to_https":true,
+                      "enable_https":true,
+                      "enable_http":true
+                    },
+                    "ntp_configuration":{
+                      "ntp_server_list":[
+                        {
+                          "type":"DNS",
+                          "addr":"0.us.pool.ntp.org"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "META":{
+                  "upgrade_mode":true,
+                  "version":{
+                      "Version":"${AMIInfo.Version}"
+                  }
+                },
+                "InitialConfiguration":[
+                  {
+                    "user_initial_setup":false,
+                    "setup_failed": false
+                  }
+                ],
+                "Tenant":[
+                  {
+                    "uuid":"admin",
+                    "name":"admin"
+                  }
+                ],
+                "User": [
+                  {
+                      "username": "admin",
+                      "user_profile_ref": "/api/useraccountprofile/?name=Default-User-Account-Profile",
+                      "name": "admin",
+                      "is_active": true,
+                      "access": [
+                          {
+                              "all_tenants": false,
+                              "tenant_ref": "/api/tenant/?name=admin",
+                              "role_ref": "/api/role/?tenant=admin&name=System-Admin"
+                          }
+                      ],
+                      "is_superuser": true,
+                      "full_name": "System Administrator",
+                      "uid": 2000,
+                      "password": "${pAviControllerPassword}",
+                      "local": true,
+                      "email": "",
+                      "default_tenant_ref": "/api/tenant/?name=admin"
+                  }
+                ]
+                }
+
+  AviController1:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref AviControllerLT
+        Version: "1"
+      NetworkInterfaces:
+        - GroupSet:
+            - !GetAtt ControllerSecurityGroup.GroupId
+          AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          DeleteOnTermination: true
+          SubnetId: !Ref rPublicSubnet
+      Tags:
+        - Key: Name
+          Value: AviController1
+
+  AviControllerRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'sts:AssumeRole'
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+                - lambda.amazonaws.com
+
+  VMimportRole:
+    Type: 'AWS::IAM::Role'
+    Condition: CreateVMImportRole
+    Properties:
+      RoleName: vmimport
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: vmie.amazonaws.com
+          Action: sts:AssumeRole
+          Condition:
+            StringEquals:
+              sts:ExternalId: vmimport
+
+  VMimportPolicy:
+    Type: 'AWS::IAM::Policy'
+    Condition: CreateVMImportRole
+    Properties:
+      PolicyName: VmimportPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - s3:ListBucket
+          - s3:GetBucketLocation
+          Resource: "*"
+        - Effect: Allow
+          Action:
+          - s3:GetObject
+          Resource: "*"
+        - Effect: Allow
+          Action:
+          - ec2:ModifySnapshotAttribute
+          - ec2:CopySnapshot
+          - ec2:RegisterImage
+          - ec2:Describe*
+          Resource: "*"
+      Roles:
+        - !Ref VMimportRole
+
+  AviControllerEC2Policy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: AviControllerEC2Policy
+      PolicyDocument:
+        Statement:
+          - Sid: Stmt1
+            Effect: Allow
+            Action:
+              - ec2:AuthorizeSecurityGroupEgress
+              - ec2:AuthorizeSecurityGroupIngress
+              - ec2:DeleteSecurityGroup
+              - ec2:DeleteTags
+              - ec2:RebootInstances
+              - ec2:RevokeSecurityGroupIngress
+              - ec2:StartInstances
+              - ec2:StopInstances
+              - ec2:TerminateInstances
+              - ec2:RevokeSecurityGroupEgress
+            Resource: "*"
+            Condition:
+              StringLike: 
+                ec2:ResourceTag/AVICLOUD_UUID: "*"
+          - Sid: Stmt2
+            Effect: Allow
+            Action:
+              - ec2:DeleteSnapshot
+              - ec2:ModifySnapshotAttribute
+            Resource: "*"
+            Condition:
+              StringLike:
+                ec2:ResourceTag/AVICLOUD_UUID: "*"
+          - Sid: Stmt3
+            Effect: Allow
+            Action:
+              - 'ec2:AllocateAddress'
+              - 'ec2:AssignPrivateIpAddresses'
+              - 'ec2:AssociateAddress'
+              - 'ec2:AttachNetworkInterface'
+              - 'ec2:AttachVolume'
+              - 'ec2:AuthorizeSecurityGroupEgress'
+              - 'ec2:AuthorizeSecurityGroupIngress'
+              - 'ec2:CancelConversionTask'
+              - 'ec2:CancelImportTask'
+              - 'ec2:CreateNetworkInterface'
+              - 'ec2:CreateSecurityGroup'
+              - 'ec2:CreateSnapshot'
+              - 'ec2:CreateTags'
+              - 'ec2:CreateVolume'
+              - 'ec2:DeleteNetworkInterface'
+              - 'ec2:DeleteSecurityGroup'
+              - 'ec2:DeleteSnapshot'
+              - 'ec2:DeleteTags'
+              - 'ec2:DeleteVolume'
+              - 'ec2:DeregisterImage'
+              - 'ec2:DescribeAddresses'
+              - 'ec2:DescribeAvailabilityZones'
+              - 'ec2:DescribeConversionTasks'
+              - 'ec2:DescribeImageAttribute'
+              - 'ec2:DescribeImages'
+              - 'ec2:DescribeImportSnapshotTasks'
+              - 'ec2:DescribeInstanceAttribute'
+              - 'ec2:DescribeInstanceStatus'
+              - 'ec2:DescribeInstances'
+              - 'ec2:DescribeInternetGateways'
+              - 'ec2:DescribeNetworkAcls'
+              - 'ec2:DescribeNetworkInterfaceAttribute'
+              - 'ec2:DescribeNetworkInterfaces'
+              - 'ec2:DescribeRegions'
+              - 'ec2:DescribeRouteTables'
+              - 'ec2:DescribeSecurityGroups'
+              - 'ec2:DescribeSnapshotAttribute'
+              - 'ec2:DescribeSnapshots'
+              - 'ec2:DescribeSubnets'
+              - 'ec2:DescribeTags'
+              - 'ec2:DescribeVolumeAttribute'
+              - 'ec2:DescribeVolumeStatus'
+              - 'ec2:DescribeVolumes'
+              - 'ec2:DescribeVpcAttribute'
+              - 'ec2:DescribeVpcs'
+              - 'ec2:DetachNetworkInterface'
+              - 'ec2:DetachVolume'
+              - 'ec2:DisassociateAddress'
+              - 'ec2:GetConsoleOutput'
+              - 'ec2:ImportSnapshot'
+              - 'ec2:ImportVolume'
+              - 'ec2:ModifyImageAttribute'
+              - 'ec2:ModifyInstanceAttribute'
+              - 'ec2:ModifyNetworkInterfaceAttribute'
+              - 'ec2:ModifySnapshotAttribute'
+              - 'ec2:ModifyVolumeAttribute'
+              - 'ec2:RebootInstances'
+              - 'ec2:RegisterImage'
+              - 'ec2:ReleaseAddress'
+              - 'ec2:ResetImageAttribute'
+              - 'ec2:ResetInstanceAttribute'
+              - 'ec2:ResetNetworkInterfaceAttribute'
+              - 'ec2:ResetSnapshotAttribute'
+              - 'ec2:RevokeSecurityGroupEgress'
+              - 'ec2:RevokeSecurityGroupIngress'
+              - 'ec2:RunInstances'
+              - 'ec2:StartInstances'
+              - 'ec2:StopInstances'
+              - 'ec2:TerminateInstances'
+              - 'ec2:UnassignPrivateIpAddresses'
+              - 'logs:CreateLogGroup'
+              - 'logs:CreateLogStream'
+              - 'logs:PutLogEvents'
+            Resource: '*'
+      Roles:
+        - !Ref AviControllerRole
+
+  AviControllerASGPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: AviControllerASGPolicy
+      PolicyDocument:
+        Statement:
+          - Sid: Stmt1
+            Effect: Allow
+            Action:
+              - autoscaling:DescribeAutoScalingGroups
+              - autoscaling:DescribeAutoScalingInstances
+              - autoscaling:DescribeLaunchConfigurations
+            Resource: "*"
+      Roles:
+        - !Ref AviControllerRole
+
+  AviControllerIAMPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: AviControllerIAMPolicy
+      PolicyDocument:
+        Statement:
+          - Sid: Stmt1
+            Effect: Allow
+            Action:
+              - iam:GetPolicy
+              - iam:GetPolicyVersion
+              - iam:ListPolicyVersions
+            Resource:
+              - !GetAtt AviControllerRole.Arn
+              - arn:aws:iam::*:policy/AviController*
+          - Sid: Stmt2
+            Effect: Allow
+            Action:
+              - iam:GetInstanceProfile
+              - iam:GetRole
+              - iam:GetRolePolicy
+              - iam:ListAttachedRolePolicies
+              - iam:ListRolePolicies
+            Resource:
+              - !GetAtt AviControllerInstanceProfile.Arn
+              - arn:aws:iam::*:policy/AviController*
+              - arn:aws:iam::*:role/vmimport
+              - !GetAtt AviControllerRole.Arn
+          - Sid: Stmt3
+            Effect: Allow
+            Action:
+              - iam:ListPolicies
+              - iam:ListRoles
+            Resource: "*"
+      Roles:
+        - !Ref AviControllerRole
+
+  AviControllerKMSPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: AviControllerKMSPolicy
+      PolicyDocument:
+        Statement:
+          - Sid: Stmt1
+            Effect: Allow
+            Action:
+              - kms:CreateGrant
+              - kms:Decrypt
+              - kms:DescribeKey
+              - kms:GenerateDataKey
+              - kms:GenerateDataKeyWithoutPlaintext
+              - kms:ReEncryptFrom
+              - kms:ReEncryptTo
+            Resource: "arn:aws:kms:*:*:key/*"
+          - Sid: Stmt2
+            Effect: Allow
+            Action:
+              - kms:ListAliases
+              - kms:ListKeys
+            Resource: "*"
+      Roles:
+        - !Ref AviControllerRole
+
+  AviControllerR53Policy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: AviControllerR53Policy
+      PolicyDocument:
+        Statement:
+          - Sid: Stmt1
+            Effect: Allow
+            Action:
+              - route53:ChangeResourceRecordSets
+              - route53:ListResourceRecordSets
+            Resource: "arn:aws:route53:::hostedzone/*"
+          - Sid: Stmt2
+            Effect: Allow
+            Action:
+              - route53:GetChange
+              - route53:GetHostedZone
+              - route53:GetHostedZoneCount
+              - route53:ListHostedZones
+              - route53:ListHostedZonesByName
+            Resource: "*"
+      Roles:
+        - !Ref AviControllerRole
+
+  AviControllerS3Policy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: AviControllerS3Policy
+      PolicyDocument:
+        Statement:
+          - Sid: Stmt1
+            Effect: Allow
+            Action:
+              - s3:ListAllMyBuckets
+            Resource: "*"
+          - Sid: Stmt2
+            Effect: Allow
+            Action:
+              - s3:CreateBucket
+              - s3:DeleteBucket
+              - s3:GetBucketLocation
+              - s3:GetBucketTagging
+              - s3:ListBucket
+              - s3:ListBucketMultipartUploads
+              - s3:PutBucketTagging
+            Resource: "arn:aws:s3:::avi-se-*"
+          - Sid: Stmt3
+            Effect: Allow
+            Action:
+              - s3:AbortMultipartUpload
+              - s3:DeleteObject
+              - s3:ListMultipartUploadParts
+              - s3:GetObject
+              - s3:PutObject
+            Resource: "arn:aws:s3:::avi-se-*/*"
+      Roles:
+        - !Ref AviControllerRole
+
+  AviControllerSQSSNSPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: AviControllerSQSSNSPolicy
+      PolicyDocument:
+        Statement:
+          - Sid: Stmt1
+            Effect: Allow
+            Action:
+              - autoscaling:DeleteNotificationConfiguration
+              - autoscaling:DescribeNotificationConfigurations
+              - autoscaling:PutNotificationConfiguration
+              - autoscaling:UpdateAutoScalingGroup
+            Resource: "*"
+          - Sid: Stmt2
+            Effect: Allow
+            Action:
+              - sqs:AddPermission
+              - sqs:CreateQueue
+              - sqs:DeleteQueue
+              - sqs:DeleteMessage
+              - sqs:DeleteMessageBatch
+              - sqs:GetQueueAttributes
+              - sqs:GetQueueUrl
+              - sqs:ListQueueTags
+              - sqs:PurgeQueue
+              - sqs:ReceiveMessage
+              - sqs:SetQueueAttributes
+              - sqs:TagQueue
+              - sqs:UntagQueue
+            Resource: "arn:aws:sqs:*:*:avi-sqs-cloud-*"
+          - Sid: Stmt3
+            Effect: Allow
+            Action:
+              - sns:Subscribe
+            Resource: "arn:aws:sns:*:*:avi-asg-cloud-*"
+          - Sid: Stmt4
+            Effect: Allow
+            Action:
+              - sns:ListTopics
+              - sns:GetSubscriptionAttributes
+              - sns:Unsubscribe
+            Resource: "*"
+          - Sid: Stmt5
+            Effect: Allow
+            Action:
+              - sns:ConfirmSubscription
+              - sns:CreateTopic
+              - sns:DeleteTopic
+              - sns:GetTopicAttributes
+              - sns:ListSubscriptionsByTopic
+              - sns:Publish
+              - sns:SetTopicAttributes
+            Resource: "arn:aws:sns:*:*:avi-asg-cloud-*"
+      Roles:
+        - !Ref AviControllerRole
+
+  AviControllerInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref AviControllerRole
+
+  ControllerSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Enable SSH access via port 22
       VpcId: !Ref pVPCId
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 3389
-          ToPort: 3389
-          CidrIp: !Ref pAllowedSSHCidr
-      SecurityGroupEgress:
-        - IpProtocol: "-1"
+          FromPort: 22
+          ToPort: 22
           CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-DemoHostSG
-
-  rDemoHost:
-    Type: AWS::EC2::Instance
-    Properties:
-      InstanceType: t3.micro
-      ImageId: !Ref pDemoHostAMI
-      KeyName: !Ref pKeyName
-      SecurityGroupIds:
-        - !GetAtt rDemoHostSG.GroupId
-      SubnetId: !Ref rPublicSubnet
-      UserData: 
-        Fn::Base64: !Sub |
-          <powershell>
-          Get-NetAdapter | Set-DnsClientServerAddress -ServerAddress ${pAviDnsVip}
-          Set-DnsClientGlobalSetting -SuffixSearchList @("example.local")
-          NET USER avidemo Avi123#@! /ADD
-          NET LOCALGROUP Administrators avidemo /ADD
-          </powershell>
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-DemoHost
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: udp
+          FromPort: 123
+          ToPort: 123
+          CidrIp: 0.0.0.0/0
 
 Outputs:
   BastionPublicIP:
     Description: Bastion host IP for SSH Access
     Value: !GetAtt rBastionHost.PublicIp
-
-  DemoPublicIP:
-    Description: RDP endpoint for Demo host
-    Value: !GetAtt rDemoHost.PublicIp
+  AviController1PublicIP:
+    Description: Public IP of the Controller1
+    Value: !GetAtt AviController1.PublicIp

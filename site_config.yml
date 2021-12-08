@@ -1,0 +1,16 @@
+avi_config:           
+  cloud:
+    - name: AWS
+      vtype: CLOUD_AWS
+      aws_configuration:
+        use_iam_roles: true
+        route53_integration: true
+        region: "{{ aws_region }}"
+        vpc_id: "{{ vpc_id }}"
+        zones: 
+          - mgmt_network_uuid: "{{ private_subnet_1_uuid }}"
+            mgmt_network_name: "{{ private_subnet_1_name }}"
+            availability_zone: "{{ private_subnet_1_az }}"
+          - mgmt_network_uuid: "{{ private_subnet_2_uuid }}"
+            mgmt_network_name: "{{ private_subnet_2_name }}"
+            availability_zone: "{{ private_subnet_2_az }}"
