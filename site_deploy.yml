@@ -5,7 +5,7 @@
     - role: avinetworks.avisdk
   tasks:
     - name: Pull in Site Variables
-      include_vars: site_vars.yml
+      include_vars: /tmp/site_vars.yml
 
     - name: Setup Avi Site
       import_role:
