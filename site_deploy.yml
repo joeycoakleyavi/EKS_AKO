@@ -12,3 +12,23 @@
         name: avinetworks.aviconfig
       vars:
         avi_config_file: site_config.yml
+
+    - name: Add AKO Helm Repo
+      kubernetes.core.helm_repository:
+        name: ako
+        repo_url: https://projects.registry.vmware.com/chartrepo/ako
+
+    - name: Create Values file for AKO Deployment
+      template:
+        src: ako-values.j2
+        dest: values.yaml
+
+    - name: Deploy AKO
+      kubernetes.core.helm:
+        name: ako
+        chart_ref: ako
+        release_namespace: avi-system
+        create_namespace: yes
+        update_repo_cache: yes
+        values: "{{ values.yaml' | from_yaml }}"
+        kube_context: "{{ eks_cluster_context }}"
