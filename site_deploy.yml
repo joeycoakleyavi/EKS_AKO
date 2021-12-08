@@ -21,7 +21,7 @@
     - name: Create Values file for AKO Deployment
       template:
         src: ako-values.j2
-        dest: values.yaml
+        dest: /tmp/values.yaml
 
     - name: Deploy AKO
       kubernetes.core.helm:
