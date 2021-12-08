@@ -1,0 +1,9 @@
+apiVersion: ako.vmware.com/v1alpha1
+kind: AviInfraSetting
+metadata:
+  name: aws-infra
+spec:
+  l7Settings:
+    shardSize: DEDICATED 
+  network:
+    enablePublicIP: true

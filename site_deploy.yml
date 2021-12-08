@@ -33,3 +33,13 @@
         update_repo_cache: yes
         values: "{{ lookup('file', 'values.yaml') | from_yaml }}"
         kube_context: "{{ eks_cluster_context }}"
+
+    - name: Apply Avi Infra CRD
+      kubernetes.core.k8s:
+        state: present
+        src: crds/AviInfraSetting.yaml
+
+    - name: Extend Default Ingress Class
+      kubernetes.core.k8s:
+        state: present
+        src: k8s/AviIngressClass.yaml
