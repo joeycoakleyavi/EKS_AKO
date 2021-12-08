@@ -27,6 +27,7 @@
       kubernetes.core.helm:
         name: ako
         chart_ref: ako/ako
+        chart_version: "{{ ako_version }}"
         release_namespace: avi-system
         create_namespace: yes
         update_repo_cache: yes
