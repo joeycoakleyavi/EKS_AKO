@@ -30,5 +30,5 @@
         release_namespace: avi-system
         create_namespace: yes
         update_repo_cache: yes
-        values: "{{ './values.yaml' | from_yaml }}"
+        values: "{{ '/tmp/values.yaml' | from_yaml }}"
         kube_context: "{{ eks_cluster_context }}"
