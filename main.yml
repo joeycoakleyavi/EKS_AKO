@@ -464,6 +464,7 @@ Resources:
           echo "default_domain: ${rHostedZoneLookup.ZoneName}" >> /tmp/site_vars.yml
           pip3 install ansible
           pip3 install avisdk
+          pip3 install openshift
           /usr/local/bin/ansible-galaxy install avinetworks.aviconfig
           /usr/local/bin/ansible-pull -C 2021-updates --clean --purge -i localhost -U https://github.com/joeycoakleyavi/EKS_AKO.git -e '{"avi_credentials":{"controller":"${AviController1.PrivateIp}","username":"admin","password":"${pAviControllerPassword}","api_version":${AMIInfo.Version}}}' site_deploy.yml
           /opt/aws/bin/cfn-signal -e 0 --stack ${AWS::StackName} --region ${AWS::Region} --resource rBastionHost
