@@ -26,7 +26,7 @@
     - name: Deploy AKO
       kubernetes.core.helm:
         name: ako
-        chart_ref: ako
+        chart_ref: ako/ako
         release_namespace: avi-system
         create_namespace: yes
         update_repo_cache: yes
