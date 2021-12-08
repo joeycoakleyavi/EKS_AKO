@@ -8,7 +8,6 @@ Metadata:
         Label: 
           default: "EKS Configuration"
         Parameters: 
-          - pKeyName
           - pVPCId
           - pAllowedSSHCidr
           - pAddressSpace
@@ -40,8 +39,8 @@ Parameters:
     Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
     Description: You may leave the default value to use the latest Amazon Linux ami.
   
-  pKeyName:
-    Type: AWS::EC2::KeyPair::KeyName
+  # pKeyName:
+  #   Type: AWS::EC2::KeyPair::KeyName
 
   pVPCId:
     Type: AWS::EC2::VPC::Id
@@ -109,7 +108,17 @@ Parameters:
     Type: String
     Description: Avi Controller Password
     NoEcho: True
+
+  pAKOVersion:
+    Type: String
+    Description: Version of AKO to Deploy
+    AllowedValues:
+      - 1.5.1
+      - 1.5.2
   
+  pRoute53HostedZone:
+    Type: AWS::Route53::HostedZone::Id
+    Description: Default domain for AKO
 
 #Mappings: 
 
@@ -385,8 +394,31 @@ Resources:
   rBastionHost:
     DependsOn: rEKSCluster
     Type: AWS::EC2::Instance
+    # Metadata:
+    #   "AWS::CloudFormation::Init":
+    #     configSets:
+    #       InstallAndRun:
+    #         - Install
+    #         - Configure
+    #     Install:
+    #       files:
+    #         /tmp/site_vars.yml:
+    #           content: !Sub |
+    #             aws_region: ${AWS::Region}
+    #             vpc_id: ${pVPCId}
+    #             private_subnet_1_uuid: ${rPrivateSubnet1}
+    #             private_subnet_1_name: ${AWS::StackName}-PrivateSubnet1
+    #             private_subnet_1_az: ${rPrivateSubnet1.AvailabilityZone}
+    #             private_subnet_2_uuid: ${rPrivateSubnet2}
+    #             private_subnet_2_name: ${AWS::StackName}-PrivateSubnet2
+    #             private_subnet_2_az: ${rPrivateSubnet2.AvailabilityZone}
+    #             avi_role_config_log_mode: false
+    #             ansible_python_interpreter: /usr/bin/python3             
+    # CreationPolicy:
+    #   ResourceSignal:
+    #     Timeout: "PT15M"
     Properties:
-      KeyName: !Ref pKeyName
+      # KeyName: !Ref pKeyName
       ImageId: !Ref pBastionAMI
       InstanceType: t2.micro
       SubnetId: !Ref rPublicSubnet
@@ -398,32 +430,43 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash -ex
           yum update -y
+          yum install -y python3 git-core
           useradd aviadmin
           echo aviadmin:${pAviControllerPassword} | chpasswd
-          usermod -aG sudo aviadmin
+          usermod -aG wheel aviadmin
           sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
           systemctl restart sshd
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           chmod 777 kubectl
           mv kubectl /usr/bin/
+          curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+          chmod 700 get_helm.sh
+          ./get_helm.sh
           aws eks update-kubeconfig --name ${rEKSCluster} --region ${AWS::Region} --role arn:aws:iam::747965802047:role/cfn_deploy
           mkdir /home/aviadmin/.kube/
           cp ~/.kube/config /home/aviadmin/.kube/config
           chown aviadmin:aviadmin -R /home/aviadmin/.kube
-          yum install -y python3 git-core
+          echo "aws_region: ${AWS::Region}" >> /tmp/site_vars.yml
+          echo "vpc_id: ${pVPCId}" >> /tmp/site_vars.yml
+          echo "private_subnet_1_uuid: ${rPrivateSubnet1}" >> /tmp/site_vars.yml
+          echo "private_subnet_1_name: ${AWS::StackName}-PrivateSubnet1" >> /tmp/site_vars.yml
+          echo "private_subnet_1_az: ${rPrivateSubnet1.AvailabilityZone}" >> /tmp/site_vars.yml
+          echo "private_subnet_2_uuid: ${rPrivateSubnet2}" >> /tmp/site_vars.yml
+          echo "private_subnet_2_name: ${AWS::StackName}-PrivateSubnet2" >> /tmp/site_vars.yml
+          echo "private_subnet_2_az: ${rPrivateSubnet2.AvailabilityZone}" >> /tmp/site_vars.yml
+          echo "public_subnet_uuid: ${rPublicSubnet}" >> /tmp/site_vars.yml
+          echo "public_subnet_name: ${AWS::StackName}-PublicSubnet" >> /tmp/site_vars.yml
+          echo "public_subnet_az: ${rPublicSubnet.AvailabilityZone}" >> /tmp/site_vars.yml
+          echo "avi_role_config_log_mode: false" >> /tmp/site_vars.yml
+          echo "ansible_python_interpreter: /usr/bin/python3" >> /tmp/site_vars.yml
+          echo "eks_cluster_context: ${rEKSCluster.Arn}" >> /tmp/site_vars.yml
+          echo "ako_version: ${pAKOVersion}" >> /tmp/site_vars.yml
+          echo "default_domain: ${rHostedZoneLookup.ZoneName}" >> /tmp/site_vars.yml
           pip3 install ansible
-
-          echo aws_region: ${AWS::Region} >> site_vars.yml
-          echo vpc_id: ${pVPCId} >> site_vars.yml
-          echo private_subnet_1_uuid: ${rPrivateSubnet1} >> site_vars.yml
-          echo private_subnet_1_name: ${AWS::StackName}-PrivateSubnet1 >> site_vars.yml
-          echo private_subnet_1_az: ${rPrivateSubnet1.AvailabilityZone} >> site_vars.yml
-          echo private_subnet_1_uuid: ${rPrivateSubnet2} >> site_vars.yml
-          echo private_subnet_1_name: ${AWS::StackName}-PrivateSubnet2 >> site_vars.yml
-          echo private_subnet_1_az: ${rPrivateSubnet2.AvailabilityZone} >> site_vars.yml
-          echo avi_role_config_log_mode: false >> site_vars.yml
-
-          echo 
+          pip3 install avisdk
+          /usr/local/bin/ansible-galaxy install avinetworks.aviconfig
+          /usr/local/bin/ansible-pull -C 2021-updates --clean --purge -i localhost -U https://github.com/joeycoakleyavi/EKS_AKO.git -e '{"avi_credentials":{"controller":"${AviController1.PrivateIp}","username":"admin","password":"${pAviControllerPassword}","api_version":${AMIInfo.Version}}}' site_deploy.yml
+          /opt/aws/bin/cfn-signal -e 0 --stack ${AWS::StackName} --region ${AWS::Region} --resource rBastionHost
 
       Tags:
         - Key: Name
@@ -1181,6 +1224,65 @@ Resources:
           ToPort: 123
           CidrIp: 0.0.0.0/0
 
+  rHostedZoneLookupLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Path: /
+      Policies:
+        - PolicyName: UpdateRouteLambdaExecutionRole
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: route53:GetHostedZone
+                Resource: "*"
+
+  rHostedZoneLookupLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Looks up Hosted Zone Name by ZoneID
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt rHostedZoneLookupLambdaExecutionRole.Arn
+      Runtime: python3.8
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+
+          def lambda_handler(event, context):
+              print("Event Received")
+              print(event)
+              r53 = boto3.client('route53')
+              responseData = {}
+              try:
+                  if event["RequestType"] == 'Delete':
+                      print("CloudFormation Delete Event!")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
+                  zone_id = event['ResourceProperties']['ZoneId']
+                  zone = r53.get_hosted_zone(Id=zone_id)
+                  zone_name = zone['HostedZone']['Name'][:-1]
+                  responseData['ZoneName'] = zone_name
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
+              except:
+                  print("Signaling Failure to CloudFormation")
+                  cfnresponse.send(event, context, cfnresponse.FAILED, responseData)
+
+  rHostedZoneLookup:
+    Type: Custom::HostedZoneLookup
+    Properties:
+      ServiceToken: !GetAtt rHostedZoneLookupLambda.Arn
+      ZoneId: !Ref pRoute53HostedZone
+
 Outputs:
   BastionPublicIP:
     Description: Bastion host IP for SSH Access
@@ -1188,3 +1290,9 @@ Outputs:
   AviController1PublicIP:
     Description: Public IP of the Controller1
     Value: !GetAtt AviController1.PublicIp
+  AviVersion:
+    Description: Avi Version Deployed
+    Value: !GetAtt AMIInfo.Version
+  Domain:
+    Description: Hosted Zone Domain Name
+    Value: !GetAtt rHostedZoneLookup.ZoneName
