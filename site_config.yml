@@ -14,3 +14,8 @@ avi_config:
           - mgmt_network_uuid: "{{ private_subnet_2_uuid }}"
             mgmt_network_name: "{{ private_subnet_2_name }}"
             availability_zone: "{{ private_subnet_2_az }}"
+  serviceenginegroup:
+    - name: Default-Group
+      cloud_ref: /api/cloud?name=AWS
+      instance_flavor: t3.medium
+      
