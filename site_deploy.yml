@@ -7,6 +7,18 @@
     - name: Pull in Site Variables
       include_vars: /tmp/site_vars.yml
 
+    - name: Wait for Controller before 
+      avi_api_session:
+        avi_credentials: "{{ avi_credentials }}"
+        api_version: "{{ avi_credentials.api_version }}"
+        http_method: get
+        timeout: 300
+        path: "cluster/runtime"
+      register: cluster_status
+
+    - debug: msg="{{ cluster_status }}"
+
+
     - name: Setup Avi Site
       import_role:
         name: avinetworks.aviconfig
