@@ -7,7 +7,7 @@
     - name: Pull in Site Variables
       include_vars: /tmp/site_vars.yml
 
-    - name: Wait for Controller before 
+    - name: Wait for Controller before continuing
       avi_api_session:
         avi_credentials: "{{ avi_credentials }}"
         api_version: "{{ avi_credentials.api_version }}"
@@ -16,6 +16,7 @@
         path: "cluster/runtime"
       register: cluster_status
       until: cluster_status.obj.cluster_state.state == "CLUSTER_UP_NO_HA"
+      ignore_errors: true
 
     - name: Setup Avi Site
       import_role:
