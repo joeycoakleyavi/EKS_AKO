@@ -74,6 +74,8 @@
       template:
         src: '{{ item.src }}'
         dest: '{{ item.dest }}'
+        owner: aviadmin
+        group: aviadmin
       loop:
         - { src: 'templates/hackazon/1-hackazon-deployment.j2', dest: '/home/aviadmin/hackazon/1-hackazon-deployment.yaml' }
         - { src: 'templates/hackazon/2-hackazon-service.j2', dest: '/home/aviadmin/hackazon/2-hackazon-service.yaml' }
