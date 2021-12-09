@@ -13,6 +13,16 @@
       vars:
         avi_config_file: site_config.yml
 
+    - name: Add Hackazon WAF Policy
+      avi_wafpolicy:
+        avi_credentials: "{{ avi_credentials }}"
+        name: "Hackazon-WAF"
+        mode: "WAF_MODE_ENFORCEMENT"
+        paranoia_level: "WAF_PARANOIA_LEVEL_LOW"
+        failure_mode: "WAF_FAILURE_MODE_OPEN"
+        waf_profile_ref: "/api/wafprofile/?name=System-WAF-Profile"
+        waf_crs_ref: "/api/wafcrs/?name=CRS-2021-1"
+
     - name: Add AKO Helm Repo
       kubernetes.core.helm_repository:
         name: ako
@@ -42,3 +52,19 @@
       kubernetes.core.k8s:
         state: present
         src: k8s/AviIngressClass.yaml
+
+    - name: Create Hackazon Certificate
+      shell: openssl req -x509 -newkey rsa:4096 -nodes -keyout hackazon-key.pem -out hackazon-cert.pem -sha256 -days 365 -subj '/CN=hackazon.{{ default_domain }}'
+
+    - name: Create Kubernetes TLS Secret for Hackazon
+      shell: kubectl create secret tls hackazon --cert=hackazon-cert.pem --key=hackazon-key.pem
+
+    - name: Generate Hackazon K8s Manifests
+      template:
+        src: '{{ item.src }}'
+        dest: '{{ item.dest }}'
+      loop:
+        - { src: 'templates/hackazon/1-hackazon-deployment.j2', dest: '/home/aviadmin/hackazon/1-hackazon-deployment.yaml' }
+        - { src: 'templates/hackazon/2-hackazon-service.j2', dest: '/home/aviadmin/hackazon/2-hackazon-service.yaml' }
+        - { src: 'templates/hackazon/3-hackazon-ingress.j2', dest: '/home/aviadmin/hackazon/3-hackazon-ingress.yaml' }
+        - { src: 'templates/hackazon/4-hackazon-hostrule-crd.j2', dest: '/home/aviadmin/hackazon/4-hackazon-hostrule-crd.yaml' }

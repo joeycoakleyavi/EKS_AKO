@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: hackazon-deployment
+  name: hackazon-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hackazon-deployment
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: hackazon-deployment
+    spec:
+      containers:
+      - image: ianwijaya/hackazon
+        name: hackazon
+        ports:
+        - containerPort: 80
