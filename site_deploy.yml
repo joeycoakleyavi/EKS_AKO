@@ -17,9 +17,6 @@
       register: cluster_status
       until: cluster_status.obj.cluster_state.state == "CLUSTER_UP_NO_HA"
 
-    - debug: msg="{{ cluster_status }}"
-
-
     - name: Setup Avi Site
       import_role:
         name: avinetworks.aviconfig
@@ -71,6 +68,7 @@
 
     - name: Create Kubernetes TLS Secret for Hackazon
       shell: kubectl create secret tls hackazon --cert=hackazon-cert.pem --key=hackazon-key.pem
+      ignore_errors: true
 
     - name: Generate Hackazon K8s Manifests
       template:
