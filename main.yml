@@ -10,7 +10,6 @@ Metadata:
         Parameters: 
           - pVPCId
           - pAllowedSSHCidr
-          - pAddressSpace
           - pBastionAMI
       -
         Label:
@@ -20,27 +19,12 @@ Metadata:
           - pInstanceType
           - pAviControllerPassword
           - pCreateVMImportExport
-      # - 
-      #   Label: 
-      #     default: "AKO Configuration"
-      #   Parameters: 
-      #     - pAviControllerIP
-      #     - pAviControllerUsername
-      #     - pAviControllerPassword
-      #     - pAviControllerVersion
-      #     - pAviAWSCloudName
-      #     - pVipSubnetId
-      #     - pVipNetworkId
-      #     - pVipNetworkMaskLength
 
 Parameters: 
   pBastionAMI:
     Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
     Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
     Description: You may leave the default value to use the latest Amazon Linux ami.
-  
-  # pKeyName:
-  #   Type: AWS::EC2::KeyPair::KeyName
 
   pVPCId:
     Type: AWS::EC2::VPC::Id
@@ -92,11 +76,11 @@ Parameters:
       - "True"
       - "False"
 
-  pAddressSpace:
-    Type: String
-    Description: Provide at least a /24 that is unused within the VPC.
-    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-4]))$
-    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-24. A minimum of /24 can be used for address space.
+  # pAddressSpace:
+  #   Type: String
+  #   Description: Provide at least a /24 that is unused within the VPC.
+  #   AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-4]))$
+  #   ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-24. A minimum of /24 can be used for address space.
 
   pAllowedSSHCidr:
     Type: String
@@ -166,7 +150,7 @@ Resources:
         - 0
         - Fn::GetAZs: !Ref 'AWS::Region'
       VpcId: !Ref pVPCId
-      CidrBlock: !Select [0, !Cidr [!Ref pAddressSpace, 4, 5]]
+      CidrBlock: !Select [0, !Cidr [!GetAtt rNetworkLookup.Network, 4, 5]]
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-PublicSubnet
@@ -178,7 +162,7 @@ Resources:
         - 0
         - Fn::GetAZs: !Ref 'AWS::Region'
       VpcId: !Ref pVPCId
-      CidrBlock: !Select [1, !Cidr [!Ref pAddressSpace, 4, 5]]
+      CidrBlock: !Select [1, !Cidr [!GetAtt rNetworkLookup.Network, 4, 5]]
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-PrivateSubnet1
@@ -190,7 +174,7 @@ Resources:
         - 1
         - Fn::GetAZs: !Ref 'AWS::Region'
       VpcId: !Ref pVPCId
-      CidrBlock: !Select [2, !Cidr [!Ref pAddressSpace, 4, 5]]
+      CidrBlock: !Select [2, !Cidr [!GetAtt rNetworkLookup.Network, 4, 5]]
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-PrivateSubnet2
@@ -392,7 +376,9 @@ Resources:
         - !Ref rBastionHostRole
 
   rBastionHost:
-    DependsOn: rEKSCluster
+    DependsOn: 
+      - rEKSCluster
+      - rEKSNodeGroup
     Type: AWS::EC2::Instance
     # Metadata:
     #   "AWS::CloudFormation::Init":
@@ -1287,6 +1273,101 @@ Resources:
       ServiceToken: !GetAtt rHostedZoneLookupLambda.Arn
       ZoneId: !Ref pRoute53HostedZone
 
+  rNetworkLookupLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Path: /
+      Policies:
+        - PolicyName: UpdateRouteLambdaExecutionRole
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeVpcs
+                  - ec2:DescribeSubnets
+                Resource: "*"
+
+  rNetworkLookupLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Finds an available 24-bit network from the VPC
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt rNetworkLookupLambdaExecutionRole.Arn
+      Runtime: python3.8
+      Code:
+        ZipFile: |
+          #!/usr/bin/python
+          import boto3
+          import ipaddress
+          import cfnresponse
+
+          ec2 = boto3.client('ec2')
+
+          def find_available_network(candidate_networks, unavailable_networks):
+              for candidate_network in candidate_networks:
+                  for unavailable_network in unavailable_networks:
+                      if candidate_network.overlaps(ipaddress.ip_network(unavailable_network)):
+                          break
+                  else:
+                      return candidate_network.compressed
+
+          def lambda_handler(event, context):
+              vpc_id = event['ResourceProperties']['VpcId']
+              responseData = {}
+
+              vpc_cidr = ec2.describe_vpcs(
+                  Filters=[
+                      {
+                          'Name': 'vpc-id',
+                          'Values': [
+                              vpc_id
+                          ]
+                      }
+                  ]
+              )['Vpcs'][0]['CidrBlock']
+
+              candidate_networks = list(ipaddress.ip_network(vpc_cidr).subnets(new_prefix=24))
+
+              subnets = ec2.describe_subnets(
+                  Filters=[
+                      {
+                          'Name': 'vpc-id',
+                          'Values': [vpc_id]
+                      }
+                  ]
+              )
+
+              unavailable_subnets = []
+              [unavailable_subnets.append(subnet['CidrBlock']) for subnet in subnets['Subnets']]
+
+              try:
+                  if event['RequestType'] == 'Delete':
+                      print('Delete Event Requested')
+                      return(cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData))
+                  responseData['Network'] = find_available_network(candidate_networks, unavailable_subnets)
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
+              except Exception:
+                  responseData['Error'] = 'Exception when trying to find an available network.'
+                  cfnresponse.send(event, context, cfnresponse.FAILED, responseData)
+
+  rNetworkLookup:
+    Type: Custom::NetworkLookup
+    Properties:
+      ServiceToken: !GetAtt rNetworkLookupLambda.Arn
+      VpcId: !Ref pVPCId
+
+
 Outputs:
   BastionPublicIP:
     Description: Bastion host IP for SSH Access
@@ -1300,3 +1381,6 @@ Outputs:
   Domain:
     Description: Hosted Zone Domain Name
     Value: !GetAtt rHostedZoneLookup.ZoneName
+  CidrSelected:
+    Description: Which /24 network was chosen for the deployment
+    Value: !GetAtt rNetworkLookup.Network

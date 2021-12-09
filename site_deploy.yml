@@ -46,6 +46,9 @@
         src: ako-values.j2
         dest: values.yaml
 
+    - pause:
+        minutes: 1
+
     - name: Deploy AKO
       kubernetes.core.helm:
         name: ako
