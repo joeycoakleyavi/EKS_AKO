@@ -16,6 +16,8 @@
         path: "cluster/runtime"
       register: cluster_status
       until: cluster_status.obj.cluster_state.state == "CLUSTER_UP_NO_HA"
+      retries: 10
+      delay: 10
       ignore_errors: true
 
     - name: Setup Avi Site
