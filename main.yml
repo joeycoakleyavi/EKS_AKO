@@ -400,9 +400,9 @@ Resources:
     #             private_subnet_2_az: ${rPrivateSubnet2.AvailabilityZone}
     #             avi_role_config_log_mode: false
     #             ansible_python_interpreter: /usr/bin/python3             
-    # CreationPolicy:
-    #   ResourceSignal:
-    #     Timeout: "PT15M"
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: "PT15M"
     Properties:
       # KeyName: !Ref pKeyName
       ImageId: !Ref pBastionAMI
@@ -431,6 +431,7 @@ Resources:
           aws eks update-kubeconfig --name ${rEKSCluster} --region ${AWS::Region} --role arn:aws:iam::747965802047:role/cfn_deploy
           mkdir /home/aviadmin/.kube/
           cp ~/.kube/config /home/aviadmin/.kube/config
+          cp ~/.kube/config /tmp/kubeconfig
           chown aviadmin:aviadmin -R /home/aviadmin/.kube
           echo "aws_region: ${AWS::Region}" >> /tmp/site_vars.yml
           echo "vpc_id: ${pVPCId}" >> /tmp/site_vars.yml
@@ -456,7 +457,7 @@ Resources:
           /usr/local/bin/ansible-galaxy install avinetworks.aviconfig
           /usr/local/bin/ansible-galaxy install avinetworks.avisdk
           /usr/local/bin/ansible-pull -C 2021-updates --clean --purge -i localhost -U https://github.com/joeycoakleyavi/EKS_AKO.git -e '{"avi_credentials":{"controller":"${AviController1.PrivateIp}","username":"admin","password":"${pAviControllerPassword}","api_version":${AMIInfo.Version}}}' site_deploy.yml
-          /opt/aws/bin/cfn-signal -e 0 --stack ${AWS::StackName} --region ${AWS::Region} --resource rBastionHost
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --region ${AWS::Region} --resource rBastionHost
 
       Tags:
         - Key: Name
