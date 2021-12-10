@@ -72,7 +72,7 @@
       shell: openssl req -x509 -newkey rsa:4096 -nodes -keyout hackazon-key.pem -out hackazon-cert.pem -sha256 -days 365 -subj '/CN=hackazon.{{ default_domain }}'
 
     - name: Create Kubernetes TLS Secret for Hackazon
-      shell: kubectl create secret tls hackazon --cert=hackazon-cert.pem --key=hackazon-key.pem
+      shell: kubectl create secret tls hackazon --cert=hackazon-cert.pem --key=hackazon-key.pem --kubeconfig=/tmp/kubeconfig
       ignore_errors: true
 
     - name: Generate Hackazon K8s Manifests
