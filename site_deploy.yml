@@ -26,15 +26,15 @@
       vars:
         avi_config_file: site_config.yml
 
-    - name: Add Hackazon WAF Policy
-      avi_wafpolicy:
-        avi_credentials: "{{ avi_credentials }}"
-        name: "Hackazon-WAF"
-        mode: "WAF_MODE_ENFORCEMENT"
-        paranoia_level: "WAF_PARANOIA_LEVEL_LOW"
-        failure_mode: "WAF_FAILURE_MODE_OPEN"
-        waf_profile_ref: "/api/wafprofile/?name=System-WAF-Profile"
-        waf_crs_ref: "/api/wafcrs/?name=CRS-2021-1"
+  #  - name: Add Hackazon WAF Policy
+  #    avi_wafpolicy:
+  #      avi_credentials: "{{ avi_credentials }}"
+  #      name: "Hackazon-WAF"
+  #      mode: "WAF_MODE_ENFORCEMENT"
+  #      paranoia_level: "WAF_PARANOIA_LEVEL_LOW"
+  #      failure_mode: "WAF_FAILURE_MODE_OPEN"
+  #      waf_profile_ref: "/api/wafprofile/?name=System-WAF-Profile"
+  #      waf_crs_ref: "/api/wafcrs/?name=CRS-2021-1"
 
     - name: Add AKO Helm Repo
       kubernetes.core.helm_repository:
